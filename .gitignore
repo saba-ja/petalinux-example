@@ -4,5 +4,3 @@ build/*
 *.jou
 vivado_*
 *.log
-**/components/*
-**/.petalinux
