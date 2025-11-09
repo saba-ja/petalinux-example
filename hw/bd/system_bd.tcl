@@ -1,162 +1,4 @@
 
-################################################################
-# This is a generated script based on design: system
-#
-# Though there are limitations about the generated script,
-# the main purpose of this utility is to make learning
-# IP Integrator Tcl commands easier.
-################################################################
-
-namespace eval _tcl {
-proc get_script_folder {} {
-   set script_path [file normalize [info script]]
-   set script_folder [file dirname $script_path]
-   return $script_folder
-}
-}
-variable script_folder
-set script_folder [_tcl::get_script_folder]
-
-################################################################
-# Check if script is running in correct Vivado version.
-################################################################
-set scripts_vivado_version 2023.2
-set current_vivado_version [version -short]
-
-if { [string first $scripts_vivado_version $current_vivado_version] == -1 } {
-   puts ""
-   if { [string compare $scripts_vivado_version $current_vivado_version] > 0 } {
-      catch {common::send_gid_msg -ssname BD::TCL -id 2042 -severity "ERROR" " This script was generated using Vivado <$scripts_vivado_version> and is being run in <$current_vivado_version> of Vivado. Sourcing the script failed since it was created with a future version of Vivado."}
-
-   } else {
-     catch {common::send_gid_msg -ssname BD::TCL -id 2041 -severity "ERROR" "This script was generated using Vivado <$scripts_vivado_version> and is being run in <$current_vivado_version> of Vivado. Please run the script in Vivado <$scripts_vivado_version> then open the design in Vivado <$current_vivado_version>. Upgrade the design by running \"Tools => Report => Report IP Status...\", then run write_bd_tcl to create an updated script."}
-
-   }
-
-   return 1
-}
-
-################################################################
-# START
-################################################################
-
-# To test this script, run the following commands from Vivado Tcl console:
-# source system_script.tcl
-
-# If there is no project opened, this script will create a
-# project, but make sure you do not have an existing project
-# <./myproj/project_1.xpr> in the current working folder.
-
-set list_projs [get_projects -quiet]
-if { $list_projs eq "" } {
-   create_project project_1 myproj -part xc7z010clg400-1
-   set_property BOARD_PART digilentinc.com:zybo-z7-10:part0:1.1 [current_project]
-}
-
-
-# CHANGE DESIGN NAME HERE
-variable design_name
-set design_name system
-
-# If you do not already have an existing IP Integrator design open,
-# you can create a design using the following command:
-#    create_bd_design $design_name
-
-# Creating design if needed
-set errMsg ""
-set nRet 0
-
-set cur_design [current_bd_design -quiet]
-set list_cells [get_bd_cells -quiet]
-
-if { ${design_name} eq "" } {
-   # USE CASES:
-   #    1) Design_name not set
-
-   set errMsg "Please set the variable <design_name> to a non-empty value."
-   set nRet 1
-
-} elseif { ${cur_design} ne "" && ${list_cells} eq "" } {
-   # USE CASES:
-   #    2): Current design opened AND is empty AND names same.
-   #    3): Current design opened AND is empty AND names diff; design_name NOT in project.
-   #    4): Current design opened AND is empty AND names diff; design_name exists in project.
-
-   if { $cur_design ne $design_name } {
-      common::send_gid_msg -ssname BD::TCL -id 2001 -severity "INFO" "Changing value of <design_name> from <$design_name> to <$cur_design> since current design is empty."
-      set design_name [get_property NAME $cur_design]
-   }
-   common::send_gid_msg -ssname BD::TCL -id 2002 -severity "INFO" "Constructing design in IPI design <$cur_design>..."
-
-} elseif { ${cur_design} ne "" && $list_cells ne "" && $cur_design eq $design_name } {
-   # USE CASES:
-   #    5) Current design opened AND has components AND same names.
-
-   set errMsg "Design <$design_name> already exists in your project, please set the variable <design_name> to another value."
-   set nRet 1
-} elseif { [get_files -quiet ${design_name}.bd] ne "" } {
-   # USE CASES: 
-   #    6) Current opened design, has components, but diff names, design_name exists in project.
-   #    7) No opened design, design_name exists in project.
-
-   set errMsg "Design <$design_name> already exists in your project, please set the variable <design_name> to another value."
-   set nRet 2
-
-} else {
-   # USE CASES:
-   #    8) No opened design, design_name not in project.
-   #    9) Current opened design, has components, but diff names, design_name not in project.
-
-   common::send_gid_msg -ssname BD::TCL -id 2003 -severity "INFO" "Currently there is no design <$design_name> in project, so creating one..."
-
-   create_bd_design $design_name
-
-   common::send_gid_msg -ssname BD::TCL -id 2004 -severity "INFO" "Making design <$design_name> as current_bd_design."
-   current_bd_design $design_name
-
-}
-
-common::send_gid_msg -ssname BD::TCL -id 2005 -severity "INFO" "Currently the variable <design_name> is equal to \"$design_name\"."
-
-if { $nRet != 0 } {
-   catch {common::send_gid_msg -ssname BD::TCL -id 2006 -severity "ERROR" $errMsg}
-   return $nRet
-}
-
-set bCheckIPsPassed 1
-##################################################################
-# CHECK IPs
-##################################################################
-set bCheckIPs 1
-if { $bCheckIPs == 1 } {
-   set list_check_ips "\ 
-xilinx.com:ip:processing_system7:5.5\
-xilinx.com:ip:axi_gpio:2.0\
-xilinx.com:ip:proc_sys_reset:5.0\
-"
-
-   set list_ips_missing ""
-   common::send_gid_msg -ssname BD::TCL -id 2011 -severity "INFO" "Checking if the following IPs exist in the project's IP catalog: $list_check_ips ."
-
-   foreach ip_vlnv $list_check_ips {
-      set ip_obj [get_ipdefs -all $ip_vlnv]
-      if { $ip_obj eq "" } {
-         lappend list_ips_missing $ip_vlnv
-      }
-   }
-
-   if { $list_ips_missing ne "" } {
-      catch {common::send_gid_msg -ssname BD::TCL -id 2012 -severity "ERROR" "The following IPs are not found in the IP Catalog:\n  $list_ips_missing\n\nResolution: Please add the repository containing the IP(s) to the project." }
-      set bCheckIPsPassed 0
-   }
-
-}
-
-if { $bCheckIPsPassed != 1 } {
-  common::send_gid_msg -ssname BD::TCL -id 2023 -severity "WARNING" "Will not continue with creation of design due to the error(s) above."
-  return 3
-}
-
 ##################################################################
 # DESIGN PROCs
 ##################################################################
@@ -218,7 +60,7 @@ proc create_root_design { parentCell } {
     CONFIG.PCW_ACT_FPGA2_PERIPHERAL_FREQMHZ {10.000000} \
     CONFIG.PCW_ACT_FPGA3_PERIPHERAL_FREQMHZ {10.000000} \
     CONFIG.PCW_ACT_PCAP_PERIPHERAL_FREQMHZ {200.000000} \
-    CONFIG.PCW_ACT_QSPI_PERIPHERAL_FREQMHZ {200.000000} \
+    CONFIG.PCW_ACT_QSPI_PERIPHERAL_FREQMHZ {10.000000} \
     CONFIG.PCW_ACT_SDIO_PERIPHERAL_FREQMHZ {50.000000} \
     CONFIG.PCW_ACT_SMC_PERIPHERAL_FREQMHZ {10.000000} \
     CONFIG.PCW_ACT_SPI_PERIPHERAL_FREQMHZ {10.000000} \
@@ -259,10 +101,10 @@ proc create_root_design { parentCell } {
     CONFIG.PCW_EN_4K_TIMER {0} \
     CONFIG.PCW_EN_ENET0 {1} \
     CONFIG.PCW_EN_GPIO {1} \
-    CONFIG.PCW_EN_QSPI {1} \
+    CONFIG.PCW_EN_QSPI {0} \
     CONFIG.PCW_EN_SDIO0 {1} \
     CONFIG.PCW_EN_UART1 {1} \
-    CONFIG.PCW_EN_USB0 {1} \
+    CONFIG.PCW_EN_USB0 {0} \
     CONFIG.PCW_FPGA_FCLK0_ENABLE {1} \
     CONFIG.PCW_GPIO_MIO_GPIO_ENABLE {1} \
     CONFIG.PCW_GPIO_MIO_GPIO_IO {MIO} \
@@ -424,11 +266,12 @@ proc create_root_design { parentCell } {
     CONFIG.PCW_MIO_9_IOTYPE {LVCMOS 3.3V} \
     CONFIG.PCW_MIO_9_PULLUP {enabled} \
     CONFIG.PCW_MIO_9_SLEW {slow} \
-    CONFIG.PCW_MIO_TREE_PERIPHERALS {GPIO#Quad SPI Flash#Quad SPI Flash#Quad SPI Flash#Quad SPI Flash#Quad SPI Flash#Quad SPI Flash#GPIO#Quad SPI Flash#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#Enet 0#Enet 0#Enet\
-0#Enet 0#Enet 0#Enet 0#Enet 0#Enet 0#Enet 0#Enet 0#Enet 0#Enet 0#USB 0#USB 0#USB 0#USB 0#USB 0#USB 0#USB 0#USB 0#USB 0#USB 0#USB 0#USB 0#SD 0#SD 0#SD 0#SD 0#SD 0#SD 0#USB Reset#SD 0#UART 1#UART 1#GPIO#GPIO#Enet\
-0#Enet 0} \
-    CONFIG.PCW_MIO_TREE_SIGNALS {gpio[0]#qspi0_ss_b#qspi0_io[0]#qspi0_io[1]#qspi0_io[2]#qspi0_io[3]/HOLD_B#qspi0_sclk#gpio[7]#qspi_fbclk#gpio[9]#gpio[10]#gpio[11]#gpio[12]#gpio[13]#gpio[14]#gpio[15]#tx_clk#txd[0]#txd[1]#txd[2]#txd[3]#tx_ctl#rx_clk#rxd[0]#rxd[1]#rxd[2]#rxd[3]#rx_ctl#data[4]#dir#stp#nxt#data[0]#data[1]#data[2]#data[3]#clk#data[5]#data[6]#data[7]#clk#cmd#data[0]#data[1]#data[2]#data[3]#reset#cd#tx#rx#gpio[50]#gpio[51]#mdc#mdio}\
+    CONFIG.PCW_MIO_TREE_PERIPHERALS {GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#Enet 0#Enet 0#Enet 0#Enet 0#Enet 0#Enet 0#Enet 0#Enet 0#Enet 0#Enet 0#Enet 0#Enet 0#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#GPIO#SD\
+0#SD 0#SD 0#SD 0#SD 0#SD 0#GPIO#SD 0#UART 1#UART 1#GPIO#GPIO#Enet 0#Enet 0} \
+    CONFIG.PCW_MIO_TREE_SIGNALS {gpio[0]#gpio[1]#gpio[2]#gpio[3]#gpio[4]#gpio[5]#gpio[6]#gpio[7]#gpio[8]#gpio[9]#gpio[10]#gpio[11]#gpio[12]#gpio[13]#gpio[14]#gpio[15]#tx_clk#txd[0]#txd[1]#txd[2]#txd[3]#tx_ctl#rx_clk#rxd[0]#rxd[1]#rxd[2]#rxd[3]#rx_ctl#gpio[28]#gpio[29]#gpio[30]#gpio[31]#gpio[32]#gpio[33]#gpio[34]#gpio[35]#gpio[36]#gpio[37]#gpio[38]#gpio[39]#clk#cmd#data[0]#data[1]#data[2]#data[3]#gpio[46]#cd#tx#rx#gpio[50]#gpio[51]#mdc#mdio}\
 \
+    CONFIG.PCW_NAND_PERIPHERAL_ENABLE {0} \
+    CONFIG.PCW_NOR_PERIPHERAL_ENABLE {0} \
     CONFIG.PCW_OVERRIDE_BASIC_CLOCK {0} \
     CONFIG.PCW_PACKAGE_DDR_BOARD_DELAY0 {0.221} \
     CONFIG.PCW_PACKAGE_DDR_BOARD_DELAY1 {0.222} \
@@ -444,17 +287,9 @@ proc create_root_design { parentCell } {
     CONFIG.PCW_PLL_BYPASSMODE_ENABLE {0} \
     CONFIG.PCW_PRESET_BANK0_VOLTAGE {LVCMOS 3.3V} \
     CONFIG.PCW_PRESET_BANK1_VOLTAGE {LVCMOS 1.8V} \
-    CONFIG.PCW_QSPI_GRP_FBCLK_ENABLE {1} \
-    CONFIG.PCW_QSPI_GRP_FBCLK_IO {MIO 8} \
-    CONFIG.PCW_QSPI_GRP_IO1_ENABLE {0} \
-    CONFIG.PCW_QSPI_GRP_SINGLE_SS_ENABLE {1} \
-    CONFIG.PCW_QSPI_GRP_SINGLE_SS_IO {MIO 1 .. 6} \
-    CONFIG.PCW_QSPI_GRP_SS1_ENABLE {0} \
     CONFIG.PCW_QSPI_INTERNAL_HIGHADDRESS {0xFCFFFFFF} \
     CONFIG.PCW_QSPI_PERIPHERAL_CLKSRC {IO PLL} \
-    CONFIG.PCW_QSPI_PERIPHERAL_ENABLE {1} \
-    CONFIG.PCW_QSPI_PERIPHERAL_FREQMHZ {200} \
-    CONFIG.PCW_QSPI_QSPI_IO {MIO 1 .. 6} \
+    CONFIG.PCW_QSPI_PERIPHERAL_ENABLE {0} \
     CONFIG.PCW_SD0_GRP_CD_ENABLE {1} \
     CONFIG.PCW_SD0_GRP_CD_IO {MIO 47} \
     CONFIG.PCW_SD0_GRP_POW_ENABLE {0} \
@@ -464,7 +299,6 @@ proc create_root_design { parentCell } {
     CONFIG.PCW_SDIO_PERIPHERAL_CLKSRC {IO PLL} \
     CONFIG.PCW_SDIO_PERIPHERAL_FREQMHZ {50} \
     CONFIG.PCW_SDIO_PERIPHERAL_VALID {1} \
-    CONFIG.PCW_SINGLE_QSPI_DATA_MODE {x4} \
     CONFIG.PCW_SMC_PERIPHERAL_CLKSRC {IO PLL} \
     CONFIG.PCW_TPIU_PERIPHERAL_CLKSRC {External} \
     CONFIG.PCW_UART0_PERIPHERAL_ENABLE {0} \
@@ -534,13 +368,11 @@ proc create_root_design { parentCell } {
     CONFIG.PCW_UIPARAM_DDR_TRAIN_READ_GATE {1} \
     CONFIG.PCW_UIPARAM_DDR_TRAIN_WRITE_LEVEL {1} \
     CONFIG.PCW_UIPARAM_DDR_USE_INTERNAL_VREF {0} \
-    CONFIG.PCW_USB0_PERIPHERAL_ENABLE {1} \
+    CONFIG.PCW_USB0_PERIPHERAL_ENABLE {0} \
     CONFIG.PCW_USB0_RESET_ENABLE {1} \
     CONFIG.PCW_USB0_RESET_IO {MIO 46} \
-    CONFIG.PCW_USB0_USB0_IO {MIO 28 .. 39} \
     CONFIG.PCW_USB_RESET_ENABLE {1} \
     CONFIG.PCW_USB_RESET_POLARITY {Active Low} \
-    CONFIG.PCW_USB_RESET_SELECT {Share reset pin} \
     CONFIG.PCW_USE_AXI_NONSECURE {0} \
     CONFIG.PCW_USE_CROSS_TRIGGER {0} \
     CONFIG.PCW_USE_M_AXI_GP0 {1} \
@@ -592,6 +424,5 @@ proc create_root_design { parentCell } {
 # MAIN FLOW
 ##################################################################
 
-create_root_design ""
 
 
